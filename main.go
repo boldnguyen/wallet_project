@@ -6,6 +6,7 @@ import (
 	"log"
 	"wallet_project/handlers"
 	"wallet_project/models"
+	"wallet_project/services"
 	"wallet_project/services/bet"
 	"wallet_project/services/connect"
 
@@ -60,7 +61,17 @@ func main() {
 			c.JSON(400, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(200, gin.H{"wallet_address": walletAddress})
+
+		playerID := "player1"
+		balance := 1000.0
+
+		err = services.SaveUserToDatabase(db, playerID, walletAddress, balance)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "Failed to save user to database"})
+			return
+		}
+
+		c.JSON(200, gin.H{"wallet_address": walletAddress, "balance": balance})
 	})
 
 	// API endpoint to place bet
