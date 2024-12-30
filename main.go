@@ -40,7 +40,6 @@ func initDatabase() {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
 }
-
 func main() {
 	// Connect to PostgreSQL
 	initDatabase()
@@ -48,14 +47,14 @@ func main() {
 	// Initialize services
 	ctx := context.Background()
 	walletService := connect.NewWalletService()
-	betService := bet.NewBetService()
+	betService := bet.NewBetService() // Khởi tạo đối tượng betService
 	spinService := bet.NewSpinService(walletService)
 
 	router := gin.Default()
 
 	// API endpoint to connect wallet
 	router.POST("/connect_wallet", func(c *gin.Context) {
-		walletAddress, err := handlers.ConnectWalletHandler(ctx, walletService, db)
+		walletAddress, err := handlers.ConnectWalletHandler(ctx, walletService, betService, db) // Truyền betService vào đây
 		if err != nil {
 			c.JSON(400, gin.H{"error": err.Error()})
 			return
@@ -74,17 +73,21 @@ func main() {
 	// API endpoint to place bet
 	router.POST("/place_bet", func(c *gin.Context) {
 		var betRequest struct {
-			BetType   models.BetType `json:"bet_type"`
-			BetAmount float64        `json:"bet_amount"`
-			Selection string         `json:"selection"`
+			WalletAddress string         `json:"wallet_address"` // Thêm wallet_address vào request body
+			BetType       models.BetType `json:"bet_type"`
+			BetAmount     float64        `json:"bet_amount"`
+			Selection     string         `json:"selection"`
 		}
 		if err := c.ShouldBindJSON(&betRequest); err != nil {
 			c.JSON(400, gin.H{"error": err.Error()})
 			return
 		}
 
-		// Call PlaceBetHandler with db passed as an argument
-		betID, err := handlers.PlaceBetHandler(ctx, betService, db, "player1", betRequest.BetType, betRequest.BetAmount, betRequest.Selection)
+		// In ra giá trị walletAddress nhận được từ request
+		fmt.Println("Wallet Address: ", betRequest.WalletAddress)
+
+		// Call PlaceBetHandler với walletAddress thay vì PlayerID
+		betID, err := handlers.PlaceBetHandler(ctx, betService, db, betRequest.WalletAddress, betRequest.BetType, betRequest.BetAmount, betRequest.Selection)
 		if err != nil {
 			c.JSON(400, gin.H{"error": err.Error()})
 			return

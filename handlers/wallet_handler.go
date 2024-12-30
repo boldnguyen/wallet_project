@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 	"wallet_project/models"
+	"wallet_project/services/bet"
 	"wallet_project/services/connect"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -22,7 +23,7 @@ func generateFakeWallet() (string, *ecdsa.PrivateKey, error) {
 	return address, privateKey, nil
 }
 
-func ConnectWalletHandler(ctx context.Context, walletService *connect.WalletService, db *gorm.DB) (string, error) {
+func ConnectWalletHandler(ctx context.Context, walletService *connect.WalletService, betService *bet.BetService, db *gorm.DB) (string, error) {
 	fmt.Println("\nConnecting Wallet...")
 
 	// Tạo ví giả
@@ -58,6 +59,8 @@ func ConnectWalletHandler(ctx context.Context, walletService *connect.WalletServ
 	if err := walletService.ConnectWallet(ctx, walletAddress); err != nil {
 		return "", fmt.Errorf("failed to connect wallet: %v", err)
 	}
+	// Thêm ví vào BetService
+	betService.AddPlayerWallet(playerID, newUser.Balance)
 
 	fmt.Printf("New wallet connected with PlayerID: %s\n", playerID)
 	return walletAddress, nil

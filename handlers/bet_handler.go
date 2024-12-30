@@ -10,33 +10,49 @@ import (
 	"gorm.io/gorm"
 )
 
-// PlaceBetHandler handles a new bet request.
-func PlaceBetHandler(ctx context.Context, betService *bet.BetService, db *gorm.DB, playerID string, betType models.BetType, amount float64, selection string) (uint, error) {
+func PlaceBetHandler(ctx context.Context, betService *bet.BetService, db *gorm.DB, walletAddress string, betType models.BetType, amount float64, selection string) (uint, error) {
 	fmt.Println("\nPlacing Bet...")
+	fmt.Println("Wallet Address: ", walletAddress)
 
-	// Tạo thông tin đặt cược
+	// Tìm người chơi từ wallet_address
+	var user models.User
+	if err := db.Where("wallet_address = ?", walletAddress).First(&user).Error; err != nil {
+		fmt.Println("Database error:", err)
+		return 0, fmt.Errorf("player wallet not found: %v", err)
+	}
+
+	// Kiểm tra số dư ví của người chơi
+	if user.Balance < amount {
+		fmt.Println("Insufficient balance:", user.Balance)
+		return 0, fmt.Errorf("insufficient balance")
+	}
+
+	// Cập nhật lại số dư ví sau khi đặt cược
+	user.Balance -= amount
+	if err := db.Save(&user).Error; err != nil {
+		return 0, fmt.Errorf("failed to update user balance: %v", err)
+	}
+
+	// Tạo thông tin cược
 	newBet := models.Bet{
-		PlayerID:  playerID,
+		PlayerID:  user.PlayerID,
 		BetType:   betType,
 		Amount:    amount,
 		Selection: selection,
 		Status:    "placed",
-		Timestamp: time.Now().Unix(), // Chuyển đổi time.Time thành Unix timestamp (int64)
+		Timestamp: time.Now().Unix(),
 	}
 
-	// Lưu vào cơ sở dữ liệu
+	// Lưu cược vào cơ sở dữ liệu
 	if err := db.Create(&newBet).Error; err != nil {
+		fmt.Println("Error saving bet:", err)
 		return 0, fmt.Errorf("failed to save bet to database: %v", err)
 	}
 
-	// Thực hiện các thao tác bổ sung với betService nếu cần
-	betID, err := betService.PlaceBet(ctx, db, playerID, betType, amount, selection)
-	if err != nil {
-		return 0, fmt.Errorf("failed to place bet: %v", err)
-	}
-
-	return betID, nil
+	// Trả về ID của cược đã lưu vào cơ sở dữ liệu
+	return newBet.ID, nil
 }
+
 func ProcessBetsHandler(ctx context.Context, spinService *bet.SpinService, betService *bet.BetService, playerID string, spinID int) error {
 	// Process bets for the current spin
 	spinResult, err := spinService.Spin()

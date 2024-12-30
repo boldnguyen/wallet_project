@@ -3,7 +3,6 @@ package bet
 import (
 	"context"
 	"fmt"
-	"time"
 	"wallet_project/models"
 
 	"gorm.io/gorm"
@@ -40,39 +39,27 @@ func (bs *BetService) GetPlayerBalance(playerID string) (float64, error) {
 	return wallet.Balance, nil
 }
 
-// PlaceBet places a bet for a player.
+// PlaceBet places a bet for a player (only handles the business logic, no DB saving)
 func (bs *BetService) PlaceBet(ctx context.Context, db *gorm.DB, playerID string, betType models.BetType, amount float64, selection string) (uint, error) {
-	// Kiểm tra xem người chơi có ví không
-	wallet, exists := bs.wallets[playerID]
-	if !exists {
-		return 0, fmt.Errorf("player wallet not found")
+	// Kiểm tra số dư ví của người chơi từ cơ sở dữ liệu
+	var user models.User
+	if err := db.Where("player_id = ?", playerID).First(&user).Error; err != nil {
+		return 0, fmt.Errorf("player wallet not found: %v", err)
 	}
 
 	// Kiểm tra xem người chơi có đủ số dư để đặt cược không
-	if wallet.Balance < amount {
+	if user.Balance < amount {
 		return 0, fmt.Errorf("insufficient balance")
 	}
 
-	// Giảm số dư của người chơi theo số tiền đặt cược
-	wallet.Balance -= amount
-
-	// Tạo và lưu thông tin cược
-	bet := models.Bet{
-		PlayerID:  playerID,
-		BetType:   betType,
-		Amount:    amount,
-		Selection: selection,
-		Status:    "placed",
-		Timestamp: time.Now().Unix(), // Lưu Unix timestamp vào Timestamp
+	// Giảm số dư của người chơi sau khi đặt cược
+	user.Balance -= amount
+	if err := db.Save(&user).Error; err != nil {
+		return 0, fmt.Errorf("failed to update user balance: %v", err)
 	}
 
-	// Lưu cược vào cơ sở dữ liệu
-	if err := db.Create(&bet).Error; err != nil {
-		return 0, fmt.Errorf("failed to save bet to database: %v", err)
-	}
-
-	// Trả về ID của cược
-	return bet.ID, nil
+	// Trả về ID của cược (hiện tại bạn không cần lưu cược ở đây)
+	return 0, nil // Không lưu cược vào DB ở đây, chỉ cần trả về ID từ bet_handler.go
 }
 
 // GetPlayerBets retrieves all bets for a specific player for the latest spin ID.
