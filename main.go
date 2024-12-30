@@ -49,7 +49,7 @@ func main() {
 	ctx := context.Background()
 	walletService := connect.NewWalletService()
 	betService := bet.NewBetService()
-	spinService := bet.NewSpinService(walletService)
+	spinService := bet.NewSpinService(db)
 
 	router := gin.Default()
 
@@ -94,20 +94,8 @@ func main() {
 		c.JSON(200, gin.H{"bet_id": betID})
 	})
 
-	// API endpoint to spin roulette
-	router.GET("/spin_roulette", func(c *gin.Context) {
-		spinResult, err := handlers.SpinRouletteHandler(spinService)
-		if err != nil {
-			c.JSON(400, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(200, gin.H{
-			"number": spinResult.Number,
-			"color":  spinResult.Color,
-			"parity": spinResult.Parity,
-			"group":  spinResult.Group,
-		})
-	})
+	// API endpoint to spin roulette using SpinRouletteHandler
+	router.GET("/spin_roulette", handlers.SpinRouletteHandler(spinService))
 
 	// Run the server
 	router.Run(":8080") // Port 8080

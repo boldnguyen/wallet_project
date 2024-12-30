@@ -14,13 +14,10 @@ import (
 func PlaceBetHandler(ctx context.Context, betService *bet.BetService, db *gorm.DB, playerID string, betType models.BetType, amount float64, selection string) (uint, error) {
 	fmt.Println("\nPlacing Bet...")
 
-	// Log để kiểm tra giá trị wallet_address
-	fmt.Printf("Checking user with wallet address: %s\n", playerID) // playerID có thể là wallet_address nếu cần thiết
-
 	// Kiểm tra sự tồn tại của người chơi
 	var user models.User
 	if err := db.Where("wallet_address = ?", playerID).First(&user).Error; err != nil {
-		return 0, fmt.Errorf("user not found for wallet address %s: %v", playerID, err) // Thêm log chi tiết
+		return 0, fmt.Errorf("user not found for wallet address %s: %v", playerID, err)
 	}
 
 	// Tạo thông tin đặt cược
@@ -38,11 +35,10 @@ func PlaceBetHandler(ctx context.Context, betService *bet.BetService, db *gorm.D
 		return 0, fmt.Errorf("failed to save bet to database: %v", err)
 	}
 
-	// Thực hiện các thao tác bổ sung với betService nếu cần
-	betID, err := betService.PlaceBet(ctx, db, playerID, betType, amount, selection)
-	if err != nil {
+	// Thực hiện kiểm tra logic bổ sung từ betService
+	if _, err := betService.PlaceBet(ctx, db, playerID, betType, amount, selection); err != nil {
 		return 0, fmt.Errorf("failed to place bet: %v", err)
 	}
 
-	return betID, nil
+	return newBet.ID, nil
 }
