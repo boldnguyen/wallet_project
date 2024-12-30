@@ -3,19 +3,40 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"time"
 	"wallet_project/models"
 	"wallet_project/services/bet"
+
+	"gorm.io/gorm"
 )
 
-func PlaceBetHandler(ctx context.Context, betService *bet.BetService, playerID string, betType models.BetType, betAmount float64, selection string) (string, error) {
+// PlaceBetHandler handles a new bet request.
+func PlaceBetHandler(ctx context.Context, betService *bet.BetService, db *gorm.DB, playerID string, betType models.BetType, amount float64, selection string) (uint, error) {
 	fmt.Println("\nPlacing Bet...")
-	betID, err := betService.PlaceBet(ctx, playerID, betType, betAmount, selection)
-	if err != nil {
-		return "", fmt.Errorf("failed to place bet: %v", err)
+
+	// Tạo thông tin đặt cược
+	newBet := models.Bet{
+		PlayerID:  playerID,
+		BetType:   betType,
+		Amount:    amount,
+		Selection: selection,
+		Status:    "placed",
+		Timestamp: time.Now().Unix(), // Chuyển đổi time.Time thành Unix timestamp (int64)
 	}
+
+	// Lưu vào cơ sở dữ liệu
+	if err := db.Create(&newBet).Error; err != nil {
+		return 0, fmt.Errorf("failed to save bet to database: %v", err)
+	}
+
+	// Thực hiện các thao tác bổ sung với betService nếu cần
+	betID, err := betService.PlaceBet(ctx, db, playerID, betType, amount, selection)
+	if err != nil {
+		return 0, fmt.Errorf("failed to place bet: %v", err)
+	}
+
 	return betID, nil
 }
-
 func ProcessBetsHandler(ctx context.Context, spinService *bet.SpinService, betService *bet.BetService, playerID string, spinID int) error {
 	// Process bets for the current spin
 	spinResult, err := spinService.Spin()

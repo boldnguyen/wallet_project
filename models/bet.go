@@ -11,6 +11,7 @@ const (
 )
 
 type Bet struct {
+	ID        uint    `gorm:"primaryKey" json:"id"`
 	PlayerID  string  `json:"player_id"`
 	BetType   BetType `json:"bet_type"`
 	Amount    float64 `json:"amount"`

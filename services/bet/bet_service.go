@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 	"wallet_project/models"
+
+	"gorm.io/gorm"
 )
 
 // BetService handles betting logic and maintains player wallets.
@@ -39,35 +41,38 @@ func (bs *BetService) GetPlayerBalance(playerID string) (float64, error) {
 }
 
 // PlaceBet places a bet for a player.
-func (bs *BetService) PlaceBet(ctx context.Context, playerID string, betType models.BetType, amount float64, selection string) (string, error) {
-	// Check if player exists
+func (bs *BetService) PlaceBet(ctx context.Context, db *gorm.DB, playerID string, betType models.BetType, amount float64, selection string) (uint, error) {
+	// Kiểm tra xem người chơi có ví không
 	wallet, exists := bs.wallets[playerID]
 	if !exists {
-		return "", fmt.Errorf("player wallet not found")
+		return 0, fmt.Errorf("player wallet not found")
 	}
 
-	// Check if the player has enough balance
+	// Kiểm tra xem người chơi có đủ số dư để đặt cược không
 	if wallet.Balance < amount {
-		return "", fmt.Errorf("insufficient balance")
+		return 0, fmt.Errorf("insufficient balance")
 	}
 
-	// Deduct the bet amount from the player's balance
+	// Giảm số dư của người chơi theo số tiền đặt cược
 	wallet.Balance -= amount
 
-	// Create and store the bet
+	// Tạo và lưu thông tin cược
 	bet := models.Bet{
 		PlayerID:  playerID,
 		BetType:   betType,
 		Amount:    amount,
 		Selection: selection,
 		Status:    "placed",
-		Timestamp: time.Now().Unix(),
+		Timestamp: time.Now().Unix(), // Lưu Unix timestamp vào Timestamp
 	}
-	bs.bets = append(bs.bets, bet)
 
-	// Generate a bet ID (for simplicity, use the timestamp)
-	betID := fmt.Sprintf("%d", bet.Timestamp)
-	return betID, nil
+	// Lưu cược vào cơ sở dữ liệu
+	if err := db.Create(&bet).Error; err != nil {
+		return 0, fmt.Errorf("failed to save bet to database: %v", err)
+	}
+
+	// Trả về ID của cược
+	return bet.ID, nil
 }
 
 // GetPlayerBets retrieves all bets for a specific player for the latest spin ID.

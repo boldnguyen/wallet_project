@@ -6,7 +6,6 @@ import (
 	"log"
 	"wallet_project/handlers"
 	"wallet_project/models"
-	"wallet_project/services"
 	"wallet_project/services/bet"
 	"wallet_project/services/connect"
 
@@ -56,22 +55,20 @@ func main() {
 
 	// API endpoint to connect wallet
 	router.POST("/connect_wallet", func(c *gin.Context) {
-		walletAddress, err := handlers.ConnectWalletHandler(ctx, walletService)
+		walletAddress, err := handlers.ConnectWalletHandler(ctx, walletService, db)
 		if err != nil {
 			c.JSON(400, gin.H{"error": err.Error()})
 			return
 		}
 
-		playerID := "player1"
-		balance := 1000.0
-
-		err = services.SaveUserToDatabase(db, playerID, walletAddress, balance)
-		if err != nil {
-			c.JSON(500, gin.H{"error": "Failed to save user to database"})
+		// Lấy PlayerID động từ `ConnectWalletHandler`
+		var user models.User
+		if err := db.Where("wallet_address = ?", walletAddress).First(&user).Error; err != nil {
+			c.JSON(500, gin.H{"error": "Failed to retrieve user from database"})
 			return
 		}
 
-		c.JSON(200, gin.H{"wallet_address": walletAddress, "balance": balance})
+		c.JSON(200, gin.H{"wallet_address": walletAddress, "player_id": user.PlayerID, "balance": user.Balance})
 	})
 
 	// API endpoint to place bet
@@ -86,7 +83,8 @@ func main() {
 			return
 		}
 
-		betID, err := handlers.PlaceBetHandler(ctx, betService, "player1", betRequest.BetType, betRequest.BetAmount, betRequest.Selection)
+		// Call PlaceBetHandler with db passed as an argument
+		betID, err := handlers.PlaceBetHandler(ctx, betService, db, "player1", betRequest.BetType, betRequest.BetAmount, betRequest.Selection)
 		if err != nil {
 			c.JSON(400, gin.H{"error": err.Error()})
 			return
