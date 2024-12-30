@@ -3,6 +3,7 @@ package bet
 import (
 	"context"
 	"fmt"
+	"time"
 	"wallet_project/models"
 
 	"gorm.io/gorm"
@@ -40,11 +41,11 @@ func (bs *BetService) GetPlayerBalance(playerID string) (float64, error) {
 }
 
 // PlaceBet places a bet for a player (only handles the business logic, no DB saving)
-func (bs *BetService) PlaceBet(ctx context.Context, db *gorm.DB, playerID string, betType models.BetType, amount float64, selection string) (uint, error) {
-	// Kiểm tra số dư ví của người chơi từ cơ sở dữ liệu
+func (bs *BetService) PlaceBet(ctx context.Context, db *gorm.DB, walletAddress string, betType models.BetType, amount float64, selection string) (uint, error) {
+	// Kiểm tra số dư ví của người chơi từ cơ sở dữ liệu, tìm theo wallet_address
 	var user models.User
-	if err := db.Where("player_id = ?", playerID).First(&user).Error; err != nil {
-		return 0, fmt.Errorf("player wallet not found: %v", err)
+	if err := db.Where("wallet_address = ?", walletAddress).First(&user).Error; err != nil {
+		return 0, fmt.Errorf("user not found for wallet address %s: %v", walletAddress, err)
 	}
 
 	// Kiểm tra xem người chơi có đủ số dư để đặt cược không
@@ -58,8 +59,22 @@ func (bs *BetService) PlaceBet(ctx context.Context, db *gorm.DB, playerID string
 		return 0, fmt.Errorf("failed to update user balance: %v", err)
 	}
 
-	// Trả về ID của cược (hiện tại bạn không cần lưu cược ở đây)
-	return 0, nil // Không lưu cược vào DB ở đây, chỉ cần trả về ID từ bet_handler.go
+	// Tạo thông tin cược mới
+	newBet := models.Bet{
+		PlayerID:  user.PlayerID,
+		BetType:   betType,
+		Amount:    amount,
+		Selection: selection,
+		Status:    "placed",
+		Timestamp: time.Now().Unix(),
+	}
+
+	// Lưu vào cơ sở dữ liệu
+	if err := db.Create(&newBet).Error; err != nil {
+		return 0, fmt.Errorf("failed to save bet to database: %v", err)
+	}
+
+	return newBet.ID, nil
 }
 
 // GetPlayerBets retrieves all bets for a specific player for the latest spin ID.

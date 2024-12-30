@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 	"wallet_project/models"
-	"wallet_project/services/bet"
 	"wallet_project/services/connect"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -23,7 +22,7 @@ func generateFakeWallet() (string, *ecdsa.PrivateKey, error) {
 	return address, privateKey, nil
 }
 
-func ConnectWalletHandler(ctx context.Context, walletService *connect.WalletService, betService *bet.BetService, db *gorm.DB) (string, error) {
+func ConnectWalletHandler(ctx context.Context, walletService *connect.WalletService, db *gorm.DB) (string, error) {
 	fmt.Println("\nConnecting Wallet...")
 
 	// Tạo ví giả
@@ -31,6 +30,9 @@ func ConnectWalletHandler(ctx context.Context, walletService *connect.WalletServ
 	if err != nil {
 		return "", fmt.Errorf("error generating wallet: %v", err)
 	}
+
+	// Log địa chỉ ví để kiểm tra
+	fmt.Printf("Wallet address: %s\n", walletAddress)
 
 	// Kiểm tra nếu địa chỉ ví đã tồn tại
 	var existingUser models.User
@@ -59,20 +61,7 @@ func ConnectWalletHandler(ctx context.Context, walletService *connect.WalletServ
 	if err := walletService.ConnectWallet(ctx, walletAddress); err != nil {
 		return "", fmt.Errorf("failed to connect wallet: %v", err)
 	}
-	// Thêm ví vào BetService
-	betService.AddPlayerWallet(playerID, newUser.Balance)
 
 	fmt.Printf("New wallet connected with PlayerID: %s\n", playerID)
 	return walletAddress, nil
-}
-
-// WithdrawFundsHandler handles fund withdrawal
-func WithdrawFundsHandler(ctx context.Context, walletService *connect.WalletService, walletAddress string, withdrawAmount float64) error {
-	fmt.Printf("Attempting to withdraw %.2f for wallet %s...\n", withdrawAmount, walletAddress)
-	err := walletService.WithdrawFunds(ctx, walletAddress, withdrawAmount)
-	if err != nil {
-		return fmt.Errorf("failed to withdraw funds: %v", err)
-	}
-	fmt.Printf("Withdrawal successful! %.2f has been deducted from your wallet.\n", withdrawAmount)
-	return nil
 }

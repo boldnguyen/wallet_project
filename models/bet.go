@@ -17,6 +17,7 @@ type Bet struct {
 	Amount    float64 `json:"amount"`
 	Selection string  `json:"selection"`
 	Status    string  `json:"status"`  // "placed", "won", "lost"
-	SpinID    int     `json:"spin_id"` // ID of the spin this bet is associated with
+	Payout    float64 `json:"payout"`  // Amount won (if applicable)
+	SpinID    uint    `json:"spin_id"` // ID of the spin this bet is associated with
 	Timestamp int64   `json:"timestamp"`
 }

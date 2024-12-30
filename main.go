@@ -40,6 +40,7 @@ func initDatabase() {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
 }
+
 func main() {
 	// Connect to PostgreSQL
 	initDatabase()
@@ -47,14 +48,14 @@ func main() {
 	// Initialize services
 	ctx := context.Background()
 	walletService := connect.NewWalletService()
-	betService := bet.NewBetService() // Khởi tạo đối tượng betService
+	betService := bet.NewBetService()
 	spinService := bet.NewSpinService(walletService)
 
 	router := gin.Default()
 
 	// API endpoint to connect wallet
 	router.POST("/connect_wallet", func(c *gin.Context) {
-		walletAddress, err := handlers.ConnectWalletHandler(ctx, walletService, betService, db) // Truyền betService vào đây
+		walletAddress, err := handlers.ConnectWalletHandler(ctx, walletService, db)
 		if err != nil {
 			c.JSON(400, gin.H{"error": err.Error()})
 			return
@@ -73,7 +74,7 @@ func main() {
 	// API endpoint to place bet
 	router.POST("/place_bet", func(c *gin.Context) {
 		var betRequest struct {
-			WalletAddress string         `json:"wallet_address"` // Thêm wallet_address vào request body
+			WalletAddress string         `json:"wallet_address"` // Thêm WalletAddress vào body
 			BetType       models.BetType `json:"bet_type"`
 			BetAmount     float64        `json:"bet_amount"`
 			Selection     string         `json:"selection"`
@@ -83,10 +84,7 @@ func main() {
 			return
 		}
 
-		// In ra giá trị walletAddress nhận được từ request
-		fmt.Println("Wallet Address: ", betRequest.WalletAddress)
-
-		// Call PlaceBetHandler với walletAddress thay vì PlayerID
+		// Call PlaceBetHandler với wallet_address từ body
 		betID, err := handlers.PlaceBetHandler(ctx, betService, db, betRequest.WalletAddress, betRequest.BetType, betRequest.BetAmount, betRequest.Selection)
 		if err != nil {
 			c.JSON(400, gin.H{"error": err.Error()})
@@ -109,26 +107,6 @@ func main() {
 			"parity": spinResult.Parity,
 			"group":  spinResult.Group,
 		})
-	})
-
-	// API endpoint to withdraw funds
-	router.POST("/withdraw_funds", func(c *gin.Context) {
-		var withdrawRequest struct {
-			WalletAddress string  `json:"wallet_address"`
-			Amount        float64 `json:"amount"`
-		}
-		if err := c.ShouldBindJSON(&withdrawRequest); err != nil {
-			c.JSON(400, gin.H{"error": err.Error()})
-			return
-		}
-
-		err := handlers.WithdrawFundsHandler(ctx, walletService, withdrawRequest.WalletAddress, withdrawRequest.Amount)
-		if err != nil {
-			c.JSON(400, gin.H{"error": err.Error()})
-			return
-		}
-
-		c.JSON(200, gin.H{"message": "Withdrawal successful"})
 	})
 
 	// Run the server
