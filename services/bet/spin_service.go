@@ -1,69 +1,71 @@
 package bet
 
 import (
+	"fmt"
 	"math/rand"
 	"time"
+	"wallet_project/models"
 
 	"gorm.io/gorm"
 )
 
-// SpinResult represents the result of a roulette spin
-type SpinResult struct {
-	Number int    `json:"number"`
-	Color  string `json:"color"`
-	Parity string `json:"parity"`
-	Group  string `json:"group"`
-}
-
-// SpinService is responsible for handling roulette spin logic
+// SpinService handles the logic for spinning the roulette.
 type SpinService struct {
 	db *gorm.DB
 }
 
-// NewSpinService creates a new SpinService
+// NewSpinService creates a new SpinService.
 func NewSpinService(db *gorm.DB) *SpinService {
 	return &SpinService{db: db}
 }
 
-// Spin performs the roulette spin and saves the result in the database
-func (s *SpinService) Spin() (*SpinResult, error) {
-	// Seed the random number generator
+// SpinRoulette generates a random spin result and saves it to the database.
+func (ss *SpinService) SpinRoulette() (*models.SpinResult, error) {
+	// Seed random number generator
 	rand.Seed(time.Now().UnixNano())
 
-	// Generate a random number between 0 and 36 (inclusive)
+	// Generate a random number between 0 and 36
 	number := rand.Intn(37)
 
-	// Determine the color of the number
-	color := "red" // Default color for simplicity (can be enhanced)
-	if number%2 == 0 {
-		color = "black"
+	// Determine color
+	color := "black"
+	if number == 0 {
+		color = "green"
+	} else if number%2 == 1 {
+		color = "red"
 	}
 
-	// Determine if the number is even or odd
+	// Determine parity (odd/even)
 	parity := "even"
 	if number%2 != 0 {
 		parity = "odd"
 	}
 
-	// Determine the group (1st 12, 2nd 12, or 3rd 12)
-	group := "1st12"
-	if number > 12 && number <= 24 {
+	// Determine group (1st12, 2nd12, 3rd12)
+	group := ""
+	switch {
+	case number >= 1 && number <= 12:
+		group = "1st12"
+	case number >= 13 && number <= 24:
 		group = "2nd12"
-	} else if number > 24 {
+	case number >= 25 && number <= 36:
 		group = "3rd12"
+	default:
+		group = "none"
 	}
 
-	// Create SpinResult object
-	spinResult := &SpinResult{
-		Number: number,
-		Color:  color,
-		Parity: parity,
-		Group:  group,
+	// Create the spin result
+	spinResult := &models.SpinResult{
+		Number:    number,
+		Color:     color,
+		Parity:    parity,
+		Group:     group,
+		Timestamp: time.Now().Unix(),
 	}
 
-	// Save the result into the database
-	if err := s.db.Create(&spinResult).Error; err != nil {
-		return nil, err
+	// Save the spin result to the database
+	if err := ss.db.Create(spinResult).Error; err != nil {
+		return nil, fmt.Errorf("failed to save spin result: %v", err)
 	}
 
 	return spinResult, nil

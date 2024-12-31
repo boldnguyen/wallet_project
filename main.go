@@ -94,8 +94,28 @@ func main() {
 		c.JSON(200, gin.H{"bet_id": betID})
 	})
 
-	// API endpoint to spin roulette using SpinRouletteHandler
-	router.GET("/spin_roulette", handlers.SpinRouletteHandler(spinService))
+	// API endpoint tính toán phần thưởng
+	router.POST("/calculate_rewards", func(c *gin.Context) {
+		var request struct {
+			SpinID int `json:"spin_id"`
+		}
+
+		// Xử lý dữ liệu đầu vào
+		if err := c.ShouldBindJSON(&request); err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+
+		// Tính toán và cập nhật phần thưởng
+		if err := handlers.CalculateRewardsHandler(context.Background(), db, request.SpinID); err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(200, gin.H{"message": "Rewards calculated and updated successfully"})
+	})
+	// Đăng ký endpoint cho vòng quay
+	router.POST("/spin", handlers.SpinRouletteHandler(spinService))
 
 	// Run the server
 	router.Run(":8080") // Port 8080

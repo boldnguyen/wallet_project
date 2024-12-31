@@ -71,3 +71,74 @@ func (bs *BetService) GetPlayerBets(playerID string, spinID int) []models.Bet {
 	}
 	return playerBets
 }
+
+// CalculateAndDistributeRewards calculates rewards for bets and updates user balances.
+func (bs *BetService) CalculateAndDistributeRewards(ctx context.Context, db *gorm.DB, spinResult models.SpinResult) error {
+	fmt.Println("\nCalculating and distributing rewards...")
+
+	// Lấy tất cả các cược liên quan đến spin_id hiện tại
+	var bets []models.Bet
+	if err := db.Where("spin_id = ?", spinResult.ID).Find(&bets).Error; err != nil {
+		return fmt.Errorf("failed to retrieve bets for spin_id %d: %v", spinResult.ID, err)
+	}
+
+	for _, bet := range bets {
+		// Tính toán phần thưởng dựa trên loại cược
+		var payout float64
+		var won bool
+
+		switch bet.BetType {
+		case "color":
+			if spinResult.Color == bet.Selection {
+				payout = bet.Amount * 2 // Tỷ lệ 1:1
+				won = true
+			}
+		case "group":
+			if spinResult.Group == bet.Selection {
+				payout = bet.Amount * 3 // Tỷ lệ 2:1
+				won = true
+			}
+		case "parity":
+			if spinResult.Parity == bet.Selection {
+				payout = bet.Amount * 2 // Tỷ lệ 1:1
+				won = true
+			}
+		case "number":
+			if fmt.Sprintf("%d", spinResult.Number) == bet.Selection {
+				payout = bet.Amount * 36 // Tỷ lệ 35:1
+				won = true
+			}
+		default:
+			continue
+		}
+
+		// Cập nhật trạng thái cược
+		if won {
+			bet.Status = "won"
+			bet.Payout = payout
+		} else {
+			bet.Status = "lost"
+			bet.Payout = 0
+		}
+
+		// Lưu thông tin cược cập nhật
+		if err := db.Save(&bet).Error; err != nil {
+			return fmt.Errorf("failed to update bet %d: %v", bet.ID, err)
+		}
+
+		// Nếu thắng, cập nhật số dư người chơi
+		if won {
+			var user models.User
+			if err := db.Where("player_id = ?", bet.PlayerID).First(&user).Error; err != nil {
+				return fmt.Errorf("failed to find user with player_id %s: %v", bet.PlayerID, err)
+			}
+
+			user.Balance += payout
+			if err := db.Save(&user).Error; err != nil {
+				return fmt.Errorf("failed to update balance for player_id %s: %v", bet.PlayerID, err)
+			}
+		}
+	}
+
+	return nil
+}
