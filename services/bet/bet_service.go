@@ -142,3 +142,37 @@ func (bs *BetService) CalculateAndDistributeRewards(ctx context.Context, db *gor
 
 	return nil
 }
+
+// CancelBet cancels an existing bet if possible and refunds the amount to the user's wallet.
+func (bs *BetService) CancelBet(db *gorm.DB, betID uint) error {
+	// Retrieve the bet
+	var bet models.Bet
+	if err := db.First(&bet, betID).Error; err != nil {
+		return fmt.Errorf("bet not found: %v", err)
+	}
+
+	// Ensure the bet is in a cancellable state
+	if bet.Status != "placed" {
+		return fmt.Errorf("bet cannot be canceled as it is in '%s' state", bet.Status)
+	}
+
+	// Retrieve the user
+	var user models.User
+	if err := db.Where("player_id = ?", bet.PlayerID).First(&user).Error; err != nil {
+		return fmt.Errorf("user not found for player_id %s: %v", bet.PlayerID, err)
+	}
+
+	// Refund the bet amount to the user's balance
+	user.Balance += bet.Amount
+	if err := db.Save(&user).Error; err != nil {
+		return fmt.Errorf("failed to refund user balance: %v", err)
+	}
+
+	// Update the bet status to "canceled"
+	bet.Status = "canceled"
+	if err := db.Save(&bet).Error; err != nil {
+		return fmt.Errorf("failed to update bet status: %v", err)
+	}
+
+	return nil
+}

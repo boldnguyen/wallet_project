@@ -3,10 +3,12 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 	"wallet_project/models"
 	"wallet_project/services/bet"
 
+	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -41,4 +43,27 @@ func PlaceBetHandler(ctx context.Context, betService *bet.BetService, db *gorm.D
 	}
 
 	return newBet.ID, nil
+}
+
+// CancelBetHandler handles bet cancellation requests.
+func CancelBetHandler(betService *bet.BetService, db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var request struct {
+			BetID uint `json:"bet_id"`
+		}
+
+		// Parse the request JSON
+		if err := c.ShouldBindJSON(&request); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		// Attempt to cancel the bet
+		if err := betService.CancelBet(db, request.BetID); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "Bet canceled successfully"})
+	}
 }

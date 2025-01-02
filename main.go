@@ -36,7 +36,7 @@ func initDatabase() {
 
 	fmt.Println("Successfully connected to the database!")
 
-	if err := db.AutoMigrate(&models.SpinResult{}, &models.User{}, &models.Bet{}); err != nil {
+	if err := db.AutoMigrate(&models.SpinResult{}, &models.User{}, &models.Bet{}, &models.WithdrawRequest{}); err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
 }
@@ -50,6 +50,7 @@ func main() {
 	walletService := connect.NewWalletService()
 	betService := bet.NewBetService()
 	spinService := bet.NewSpinService(db)
+	withdrawService := bet.NewWithdrawService(db)
 
 	router := gin.Default()
 
@@ -93,6 +94,8 @@ func main() {
 
 		c.JSON(200, gin.H{"bet_id": betID})
 	})
+	// API endpoint to cancel a bet
+	router.POST("/cancel_bet", handlers.CancelBetHandler(betService, db))
 
 	// API endpoint tính toán phần thưởng
 	router.POST("/calculate_rewards", func(c *gin.Context) {
@@ -116,6 +119,8 @@ func main() {
 	})
 	// Đăng ký endpoint cho vòng quay
 	router.POST("/spin", handlers.SpinRouletteHandler(spinService))
+	// Đăng ký endpoint rút tiền
+	router.POST("/withdraw", handlers.WithdrawHandler(withdrawService))
 
 	// Run the server
 	router.Run(":8080") // Port 8080
